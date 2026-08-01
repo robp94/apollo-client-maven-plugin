@@ -45,6 +45,7 @@ The compiler entry point was rewritten between 3.x and 4.x/5.x. This is not a re
 | `generateResponseFields` | **removed** |
 | introspection helpers in `apollo-compiler` | moved to `apollo-ast`, `com.apollographql.apollo.ast.introspection` |
 | `operationManifestFile` on `Options` | parameter of `buildSchemaAndOperationsSources` |
+| `ApolloCompiler.NoOpLogger` (public) | **private** in v5 — supply our own `ApolloCompiler.Logger` bridging to the Maven log |
 
 Build-chain fallout: `apollo-compiler` 5 needs Kotlin 2.x, and pulls in `kotlinx-serialization`,
 KotlinPoet and JavaPoet. Our POM pins Kotlin 1.9.21, passes the long-obsolete `-Xuse-ir` flag, and
@@ -54,18 +55,39 @@ uses `dokka-maven-plugin` 0.9.17 — none of which survive a Kotlin 2 bump.
 
 Gates everything else. Cheap; do it first.
 
-- [ ] Throwaway Maven project depending on `com.apollographql.apollo:apollo-compiler:5.0.1`, run `mvn dependency:tree`.
-  - [ ] **Does `apollo-ast` resolve under plain Maven?** `apollo-compiler` is a plain JVM module but declares `api(project(":apollo-ast"))`, and apollo-ast is Kotlin Multiplatform. KMP publishes Gradle module metadata that Maven cannot read. If the root coordinate fails, pin `apollo-ast-jvm` / `apollo-api-jvm` explicitly. **Biggest unknown in the project.**
-  - [ ] Confirm Java 17 is sufficient for the compiler bytecode.
+- [x] Throwaway Maven project depending on `com.apollographql.apollo:apollo-compiler:5.0.1`, run `mvn dependency:tree`.
+  - [x] **Does `apollo-ast` resolve under plain Maven?** — **Yes, no workaround needed.** Apollo's published POM already points at the platform artifacts: `apollo-ast-jvm` and `apollo-annotations-jvm`. The KMP/Gradle-module-metadata concern does not apply. This was the project's biggest unknown; it is closed.
+  - [x] Confirm Java 17 is sufficient — **settled by decision, not measured.** No MCP tool exposes a jar's class-file major version, and it is moot: 17 clears any plausible floor for a library whose own stdlib is Kotlin 1.9.
+- [x] Maven wrapper added to the repo (Maven 3.9.16). Local toolchain is JDK 21.
 - [ ] Check out the sibling `apollo-kotlin` clone at tag **`v5.0.1`**, not `main`. It currently sits on `5.0.2-SNAPSHOT`; reading snapshot sources while compiling against a release is a subtle way to lose an afternoon.
 
-**Outcome determines the POM dependency block.** Record findings here when done.
+### Resolved dependency tree (2026-08-01)
+
+```
+com.apollographql.apollo:apollo-compiler:5.0.1
+├─ org.jetbrains.kotlin:kotlin-stdlib:1.9.0
+├─ com.apollographql.apollo:apollo-ast-jvm:5.0.1
+│  ├─ com.squareup.okio:okio-jvm:3.16.2
+│  ├─ com.apollographql.apollo:apollo-annotations-jvm:5.0.1
+│  └─ dev.drewhamilton.poko:poko-annotations-jvm:0.21.3 (runtime)
+├─ com.squareup:kotlinpoet-jvm:2.2.0
+├─ com.squareup:javapoet:1.13.0
+├─ org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.8.1
+└─ org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.8.1 (runtime)
+```
+
+**Finding that changes Stage 1:** the tree pulls **kotlin-stdlib 1.9.0**, not 2.x. That matches
+`apollo-compiler`'s own build, which pins language level `KOTLIN_1_9`. **Apollo 5 does not force a
+Kotlin 2 upgrade.** Keep `kotlin.version` at 1.9.21 for the first pass so the Apollo migration is
+isolated from a Kotlin upgrade; bump Kotlin as a separate, later change with its own PR. This also
+defers the dokka problem, since dokka 0.9.17 only breaks under Kotlin 2.
 
 ## Stage 1 — Port existing features to 5.0.1
 
 Each step should compile before starting the next.
 
-- [ ] **POM** — `apollo.version` → `5.0.1`; groupId `com.apollographql.apollo3` → `com.apollographql.apollo`; Kotlin 1.9.21 → 2.1.x; `java.version` → 17; drop `-Xuse-ir`; bump or drop dokka; drop moshi if apollo-ast's JSON reader covers `SchemaDownloader`.
+- [x] **POM** — `apollo.version` → `5.0.1`; groupId `com.apollographql.apollo3` → `com.apollographql.apollo`; `java.version` → 17; `apollo-ast` → `apollo-ast-jvm` (matching what apollo-compiler's own POM depends on). Kotlin left at 1.9.21 and dokka untouched per the Stage 0 finding. **Verified: all dependencies resolve, zero resolution errors — every remaining failure is source-level.**
+  - [ ] Still open, deferred to the cleanup step: drop `-Xuse-ir`; drop moshi if apollo-ast's JSON reader covers `SchemaDownloader`; check whether `apollo-api-jvm` is still needed by the plugin module at all.
 - [ ] **`util/ConfigUtils.kt`, `util/SchemaDownloader.kt`** — introspection imports → `com.apollographql.apollo.ast.introspection`. Small, isolated, unblocks the rest.
 - [ ] **`config/CompilerParams.kt`, `config/CompilationUnit.kt`** — clean break: delete `generateTestBuilders`, `generateResponseFields`, `operationIdGeneratorClass`, `metadataFiles`, `testDirectory`, `debugDirectory`. Remap survivors onto the three new options classes.
 - [ ] **`GraphQLClientMojo.execute()`** — the real work. Build `InputFile` lists → three options objects → `buildSchemaAndOperationsSources(...)` → `SourceOutput.writeTo(...)`.
