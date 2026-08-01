@@ -5,17 +5,21 @@ import org.apache.maven.project.MavenProject
 import java.io.File
 
 object BuildDirLayout {
-    internal fun operationOuput(project: MavenProject, compilationUnit: CompilationUnit): File {
-        return File(
+    internal fun operationOuput(
+        project: MavenProject,
+        compilationUnit: CompilationUnit,
+    ): File =
+        File(
             project.build.directory.plus("/generated/operationOutput/apollo/${compilationUnit.name}/operationOutput.json"),
         )
-    }
 
-    internal fun sources(project: MavenProject, compilationUnit: CompilationUnit): File {
-        return File(
+    internal fun sources(
+        project: MavenProject,
+        compilationUnit: CompilationUnit,
+    ): File =
+        File(
             project.build.directory.plus(
                 "/generated-sources/apollo/${compilationUnit.name}",
             ),
         )
-    }
 }

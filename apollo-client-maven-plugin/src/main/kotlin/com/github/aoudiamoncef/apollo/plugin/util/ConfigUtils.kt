@@ -12,8 +12,11 @@ import java.nio.file.PathMatcher
 import java.nio.file.Paths
 
 object ConfigUtils {
-
-    internal fun checkService(project: MavenProject, serviceName: String, service: Service): Service {
+    internal fun checkService(
+        project: MavenProject,
+        serviceName: String,
+        service: Service,
+    ): Service {
         service.introspection = if (service.isIntrospectionInitialised()) service.introspection else Introspection()
         service.compilationUnit =
             if (service.isCompilationUnitInitialised()) service.compilationUnit else CompilationUnit()
@@ -102,21 +105,30 @@ object ConfigUtils {
         return compilerParams
     }
 
-    internal fun findFilesByMatcher(files: Set<File>, matcher: PathMatcher): Set<File> {
-        return files.asSequence()
+    internal fun findFilesByMatcher(
+        files: Set<File>,
+        matcher: PathMatcher,
+    ): Set<File> =
+        files
+            .asSequence()
             .filter { file -> matcher.matches(file.toPath()) }
             .toSet()
-    }
 
-    internal fun getSourceSetFiles(sourceFolder: File, includes: Set<String>, excludes: Set<String>): Set<File> {
-        val scanner = DirectoryScanner().apply {
-            basedir = sourceFolder
-            isCaseSensitive = false
-            setIncludes(includes.toTypedArray())
-            addExcludes(excludes.toTypedArray())
-            scan()
-        }
-        return scanner.includedFiles.asSequence()
+    internal fun getSourceSetFiles(
+        sourceFolder: File,
+        includes: Set<String>,
+        excludes: Set<String>,
+    ): Set<File> {
+        val scanner =
+            DirectoryScanner().apply {
+                basedir = sourceFolder
+                isCaseSensitive = false
+                setIncludes(includes.toTypedArray())
+                addExcludes(excludes.toTypedArray())
+                scan()
+            }
+        return scanner.includedFiles
+            .asSequence()
             .map { path -> Paths.get(sourceFolder.path, path).toFile() }
             .filter { file -> file.exists() }
             .toSet()
@@ -152,11 +164,13 @@ object ConfigUtils {
                 }
             }
         } else {
-            val candidates = directories.flatMap { srcDir ->
-                srcDir.walkTopDown()
-                    .filter { it.name == "schema.json" || it.name == "schema.sdl" || it.name == "schema.graphqls" }
-                    .toList()
-            }
+            val candidates =
+                directories.flatMap { srcDir ->
+                    srcDir
+                        .walkTopDown()
+                        .filter { it.name == "schema.json" || it.name == "schema.sdl" || it.name == "schema.graphqls" }
+                        .toList()
+                }
 
             require(candidates.size <= 1) {
                 throw MojoExecutionException(

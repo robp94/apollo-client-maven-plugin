@@ -12,7 +12,9 @@ import com.apollographql.apollo.compiler.MODELS_RESPONSE_BASED
  *
  * Note: the `compat` model was removed in Apollo 4 and has no replacement.
  */
-enum class Codegen(val label: String) {
+enum class Codegen(
+    val label: String,
+) {
     OPERATION(MODELS_OPERATION_BASED),
     RESPONSE(MODELS_RESPONSE_BASED),
     OPERATION_WITH_INTERFACES(MODELS_OPERATION_BASED_WITH_INTERFACES),

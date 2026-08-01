@@ -13,7 +13,6 @@ import com.apollographql.apollo.compiler.TargetLanguage
  * [com.apollographql.apollo.compiler.CodegenOptions].
  */
 class CompilerParams {
-
     /**
      * Warn if using a deprecated field
      *
