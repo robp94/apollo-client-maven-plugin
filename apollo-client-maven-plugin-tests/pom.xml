@@ -22,12 +22,12 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.apollographql.apollo3</groupId>
+            <groupId>com.apollographql.apollo</groupId>
             <artifactId>apollo-api-jvm</artifactId>
             <version>${apollo.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.apollographql.apollo3</groupId>
+            <groupId>com.apollographql.apollo</groupId>
             <artifactId>apollo-runtime-jvm</artifactId>
             <version>${apollo.version}</version>
         </dependency>
@@ -132,47 +132,28 @@
                                         <outputDirectory>
                                             ${project.build.directory}/generated-sources/graphql-client/books/
                                         </outputDirectory>
-                                        <testDirectory>
-                                            ${project.build.directory}/generated-sources/graphql-client/books/test/
-                                        </testDirectory>
-                                        <debugDirectory>
-                                            ${project.build.directory}/generated-sources/graphql-client/books/debug/
-                                        </debugDirectory>
                                         <generateOperationDescriptors>true</generateOperationDescriptors>
                                         <compilerParams>
-                                            <rootFolders>
-                                                <rootFolder>${project.basedir}/src/main/graphql/books/</rootFolder>
-                                            </rootFolders>
-                                            <generateKotlinModels>true</generateKotlinModels>
                                             <scalarsMapping>
                                                 <Long>
                                                     <targetName>java.lang.Long</targetName>
                                                 </Long>
                                             </scalarsMapping>
-                                            <operationIdGeneratorClass></operationIdGeneratorClass>
                                             <operationManifestFormat>persistedQueryManifest</operationManifestFormat>
-                                            <schemaPackageName>com.lahzouz.apollo.graphql.client</schemaPackageName>
                                             <packageName>com.lahzouz.apollo.graphql.client</packageName>
                                             <codegenModels>OPERATION</codegenModels>
                                             <flattenModels>true</flattenModels>
-                                            <generateApolloMetadata>false</generateApolloMetadata>
                                             <generateAsInternal>false</generateAsInternal>
                                             <generateFilterNotNull>false</generateFilterNotNull>
                                             <generateFragmentImplementations>false</generateFragmentImplementations>
-                                            <generateResponseFields>false</generateResponseFields>
                                             <generateQueryDocument>true</generateQueryDocument>
                                             <generateSchema>false</generateSchema>
-                                            <generateTestBuilders>false</generateTestBuilders>
                                             <generateOptionalOperationVariables>false
                                             </generateOptionalOperationVariables>
-                                            <nullableFieldStyle>NONE</nullableFieldStyle>
                                             <useSemanticNaming>true</useSemanticNaming>
-                                            <targetLanguage>KOTLIN_1_5</targetLanguage>
+                                            <targetLanguage>KOTLIN_1_9</targetLanguage>
                                             <sealedClassesForEnumsMatching></sealedClassesForEnumsMatching>
                                             <alwaysGenerateTypesMatching></alwaysGenerateTypesMatching>
-                                            <metadataOutputFile>
-                                                ${project.build.directory}/generated/metadata/apollo/books/metadata.json
-                                            </metadataOutputFile>
                                         </compilerParams>
                                     </compilationUnit>
                                     <introspection>

@@ -1,10 +1,10 @@
 package com.lahzouz.java.graphql.client.tests
 
-import com.apollographql.apollo3.ApolloClient
-import com.apollographql.apollo3.api.*
-import com.apollographql.apollo3.api.json.JsonReader
-import com.apollographql.apollo3.api.json.JsonWriter
-import com.apollographql.apollo3.network.okHttpClient
+import com.apollographql.apollo.ApolloClient
+import com.apollographql.apollo.api.*
+import com.apollographql.apollo.api.json.JsonReader
+import com.apollographql.apollo.api.json.JsonWriter
+import com.apollographql.apollo.network.okHttpClient
 import com.coxautodev.graphql.tools.SchemaParser
 import com.lahzouz.apollo.graphql.client.GetAuthorsQuery
 import com.lahzouz.apollo.graphql.client.GetBooksQuery
