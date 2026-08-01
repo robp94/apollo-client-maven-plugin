@@ -1,5 +1,6 @@
 package com.github.aoudiamoncef.apollo.plugin.config
 
+import com.apollographql.apollo.compiler.GeneratedMethod
 import com.apollographql.apollo.compiler.JavaNullable
 import com.apollographql.apollo.compiler.MANIFEST_NONE
 import com.apollographql.apollo.compiler.TargetLanguage
@@ -184,4 +185,104 @@ class CompilerParams {
      * Default value: true for "operationBased" and "responseBased", false else
      */
     internal val flattenModels: Boolean = true
+
+    // ---------------------------------------------------------------------------------------------
+    // The options below default to null, meaning "leave it to Apollo". Do not substitute Apollo's
+    // documented default here: repeating it would silently freeze this plugin on whatever the
+    // default was when the option was added.
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Which methods to generate on models. Any of `EQUALS_HASH_CODE`, `TO_STRING`, `COPY`,
+     * `DATA_CLASS`.
+     *
+     * `DATA_CLASS` is Kotlin only and subsumes the others, so it must be the only value if used.
+     *
+     * Apollo default: `DATA_CLASS` for Kotlin, `EQUALS_HASH_CODE` and `TO_STRING` for Java.
+     */
+    internal val generateMethods: List<GeneratedMethod>? = null
+
+    /**
+     * Whether generated enums carry an entry for values not known at build time.
+     *
+     * Worth enabling when the server may add enum values after this build ships, which would
+     * otherwise fail to deserialize.
+     */
+    internal val addUnknownForEnums: Boolean? = null
+
+    /**
+     * Whether generated input objects get default arguments, which makes constructing input types
+     * with many optional fields far less verbose.
+     */
+    internal val addDefaultArgumentForInputObjects: Boolean? = null
+
+    /**
+     * Class name for the generated schema class. Only meaningful together with [generateSchema].
+     *
+     * Apollo default: `__Schema`.
+     */
+    internal val generatedSchemaName: String? = null
+
+    /**
+     * When `__typename` is added to selections.
+     *
+     * One of `ifFragments`, `ifPolymorphic`, `ifAbstract` or `always`. The Apollo default,
+     * `ifFragments`, is almost always the right choice.
+     */
+    internal val addTypename: String? = null
+
+    /**
+     * Whether to allow fragment arguments. Experimental in Apollo.
+     */
+    internal val allowFragmentArguments: Boolean? = null
+
+    /**
+     * Severity per Apollo issue type, keyed by the issue class name, for example `DeprecatedUsage`,
+     * `UnusedFragment`, `UnusedVariable` or `IgnoredLinkDirective`.
+     *
+     * Values are `Ignore`, `Warn` or `Error`, matched case-insensitively.
+     *
+     * Entries here take precedence over [warnOnDeprecatedUsages].
+     */
+    internal val issueSeverities: Map<String, String> = emptyMap()
+
+    /**
+     * Whether to generate primitives instead of boxed types where possible.
+     *
+     * Only valid when [targetLanguage] is [TargetLanguage.JAVA].
+     */
+    internal val generatePrimitiveTypes: Boolean? = null
+
+    /**
+     * Regex patterns for GraphQL enums to generate as Java classes rather than enums, giving access
+     * to the raw value for values not known at build time.
+     *
+     * Only valid when [targetLanguage] is [TargetLanguage.JAVA]. The Kotlin equivalent is
+     * [sealedClassesForEnumsMatching].
+     */
+    internal val classesForEnumsMatching: List<String>? = null
+
+    /**
+     * Whether to add `@JvmOverloads` to generated constructors. Useful when Java code calls the
+     * generated Kotlin classes.
+     *
+     * Only valid when [targetLanguage] is not [TargetLanguage.JAVA].
+     */
+    internal val addJvmOverloads: Boolean? = null
+
+    /**
+     * Whether to generate builders for input types, in addition to constructors. Constructors
+     * require wrapping every optional field in `Optional`, which builders avoid. Experimental in
+     * Apollo.
+     *
+     * Only valid when [targetLanguage] is not [TargetLanguage.JAVA].
+     */
+    internal val generateInputBuilders: Boolean? = null
+
+    /**
+     * The annotation to use for schema elements marked `@requiresOptIn`. Pass `none` to disable.
+     *
+     * Only valid when [targetLanguage] is not [TargetLanguage.JAVA].
+     */
+    internal val requiresOptInAnnotation: String? = null
 }

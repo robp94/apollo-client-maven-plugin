@@ -10,6 +10,7 @@ import com.apollographql.apollo.compiler.buildIrOptions
 import com.apollographql.apollo.compiler.codegen.writeTo
 import com.apollographql.apollo.compiler.toInputFiles
 import com.github.aoudiamoncef.apollo.plugin.config.CompilationUnit
+import com.github.aoudiamoncef.apollo.plugin.config.CompilerParams
 import com.github.aoudiamoncef.apollo.plugin.config.Introspection
 import com.github.aoudiamoncef.apollo.plugin.config.Service
 import com.github.aoudiamoncef.apollo.plugin.util.ConfigUtils
@@ -160,15 +161,9 @@ class GraphQLClientMojo : AbstractMojo() {
                     flattenModels = compilerParams.flattenModels,
                     failOnWarnings = compilerParams.failOnWarnings,
                     generateOptionalOperationVariables = compilerParams.generateOptionalOperationVariables,
-                    // `warnOnDeprecatedUsages` no longer exists as a flag; deprecation is one of several
-                    // issues whose severity is configurable. Warn is already the compiler default, so we
-                    // only need to say something when the user opted out.
-                    issueSeverity =
-                        if (compilerParams.warnOnDeprecatedUsages) {
-                            null
-                        } else {
-                            mapOf(DeprecatedUsage::class.simpleName!! to IssueSeverity.Ignore)
-                        },
+                    addTypename = compilerParams.addTypename,
+                    allowFragmentArguments = compilerParams.allowFragmentArguments,
+                    issueSeverity = resolveIssueSeverities(compilerParams),
                 )
 
             // `CodegenOptions.validate()` throws if an option belonging to the other target language
@@ -182,11 +177,20 @@ class GraphQLClientMojo : AbstractMojo() {
                     generateFragmentImplementations = compilerParams.generateFragmentImplementations,
                     generateQueryDocument = compilerParams.generateQueryDocument,
                     generateSchema = compilerParams.generateSchema,
+                    generateMethods = compilerParams.generateMethods,
+                    addUnknownForEnums = compilerParams.addUnknownForEnums,
+                    addDefaultArgumentForInputObjects = compilerParams.addDefaultArgumentForInputObjects,
+                    generatedSchemaName = compilerParams.generatedSchemaName,
                     generateModelBuilders = if (isJava) compilerParams.generateModelBuilders else null,
                     nullableFieldStyle = if (isJava) compilerParams.nullableFieldStyle else null,
+                    generatePrimitiveTypes = if (isJava) compilerParams.generatePrimitiveTypes else null,
+                    classesForEnumsMatching = if (isJava) compilerParams.classesForEnumsMatching else null,
                     generateAsInternal = if (isJava) null else compilerParams.generateAsInternal,
                     generateFilterNotNull = if (isJava) null else compilerParams.generateFilterNotNull,
                     sealedClassesForEnumsMatching = if (isJava) null else compilerParams.sealedClassesForEnumsMatching,
+                    addJvmOverloads = if (isJava) null else compilerParams.addJvmOverloads,
+                    generateInputBuilders = if (isJava) null else compilerParams.generateInputBuilders,
+                    requiresOptInAnnotation = if (isJava) null else compilerParams.requiresOptInAnnotation,
                 )
 
             val sourceOutput =
@@ -227,6 +231,41 @@ class GraphQLClientMojo : AbstractMojo() {
         val timeElapsed = (finish - start).toDouble() / 1000000000
         log.info("Total time: ${String.format("%.3f", timeElapsed)} s")
     }
+
+    /**
+     * Combines [CompilerParams.warnOnDeprecatedUsages] with the finer-grained
+     * [CompilerParams.issueSeverities] map.
+     *
+     * `warnOnDeprecatedUsages` no longer exists as an Apollo flag; deprecation is just one issue type
+     * whose severity is configurable. Warn is already Apollo's default, so the boolean only needs to
+     * say anything when the user opted out. An explicit `issueSeverities` entry wins, so that the
+     * more specific setting is not silently overridden by the coarser one.
+     *
+     * Returns null when nothing was configured, leaving Apollo's defaults untouched.
+     */
+    private fun resolveIssueSeverities(compilerParams: CompilerParams): Map<String, IssueSeverity>? {
+        val severities = mutableMapOf<String, IssueSeverity>()
+
+        if (!compilerParams.warnOnDeprecatedUsages) {
+            severities[DeprecatedUsage::class.simpleName!!] = IssueSeverity.Ignore
+        }
+
+        compilerParams.issueSeverities.forEach { (issue, severity) ->
+            severities[issue] = parseIssueSeverity(issue, severity)
+        }
+
+        return severities.takeIf { it.isNotEmpty() }
+    }
+
+    private fun parseIssueSeverity(
+        issue: String,
+        value: String,
+    ): IssueSeverity =
+        IssueSeverity.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
+            ?: throw MojoExecutionException(
+                "Unknown issue severity '$value' for issue '$issue'. Expected one of: " +
+                    IssueSeverity.entries.joinToString { it.name },
+            )
 
     /**
      * Bridges the Apollo compiler's diagnostics onto the Maven log.

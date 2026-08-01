@@ -67,6 +67,33 @@ The Apollo column shows which of the three v5 options objects each value feeds.
 | `sealedClassesForEnumsMatching` | list of regex | *(empty)* | `CodegenOptions` — **Kotlin only** |
 | `generateModelBuilders` | boolean | `false` | `CodegenOptions` — **Java only** |
 | `nullableFieldStyle` | `JavaNullable` | `NONE` | `CodegenOptions` — **Java only** |
+| `generateMethods` | list of `EQUALS_HASH_CODE` \| `TO_STRING` \| `COPY` \| `DATA_CLASS` | *(Apollo default)* | `CodegenOptions` |
+| `addUnknownForEnums` | boolean | *(Apollo default)* | `CodegenOptions` |
+| `addDefaultArgumentForInputObjects` | boolean | *(Apollo default)* | `CodegenOptions` |
+| `generatedSchemaName` | string | *(Apollo default `__Schema`)* | `CodegenOptions` |
+| `addTypename` | `ifFragments` \| `ifPolymorphic` \| `ifAbstract` \| `always` | *(Apollo default `ifFragments`)* | `IrOptions` |
+| `allowFragmentArguments` | boolean | *(Apollo default)* | `IrOptions` |
+| `issueSeverities` | map of issue name → `Ignore` \| `Warn` \| `Error` | *(empty)* | `IrOptions.issueSeverities` |
+| `generatePrimitiveTypes` | boolean | *(Apollo default)* | `CodegenOptions` — **Java only** |
+| `classesForEnumsMatching` | list of regex | *(Apollo default)* | `CodegenOptions` — **Java only** |
+| `addJvmOverloads` | boolean | *(Apollo default)* | `CodegenOptions` — **Kotlin only** |
+| `generateInputBuilders` | boolean | *(Apollo default)* | `CodegenOptions` — **Kotlin only** |
+| `requiresOptInAnnotation` | string | *(Apollo default)* | `CodegenOptions` — **Kotlin only** |
+
+> **Why some defaults say *(Apollo default)*.** Those options are unset unless you configure them, so
+> Apollo's own default applies. Repeating Apollo's default here would freeze the plugin on whatever it
+> happened to be when the option was added, and quietly diverge on the next upgrade.
+
+> **`issueSeverities` and `warnOnDeprecatedUsages` overlap.** `warnOnDeprecatedUsages` is the coarse
+> switch for one issue type; `issueSeverities` addresses any of them by class name — `DeprecatedUsage`,
+> `UnusedFragment`, `UnusedVariable`, `IgnoredLinkDirective`. An explicit `issueSeverities` entry wins.
+>
+> ```xml
+> <issueSeverities>
+>     <UnusedFragment>Ignore</UnusedFragment>
+>     <DeprecatedUsage>Error</DeprecatedUsage>
+> </issueSeverities>
+> ```
 
 > **Language-specific options.** Apollo's `CodegenOptions.validate()` throws if an option belonging to
 > the *other* target language is set at all. The plugin therefore passes Java-only options only when
@@ -128,31 +155,13 @@ Available in Apollo 5 but not exposed by the plugin.
 GraphQL API. Kotlin Multiplatform, JS and Native concerns are deliberately at the bottom. Nothing
 here is blocked; the split below is by *effort*, not by feasibility.
 
-### Tier 1 — pass-through
+### Tier 1 — done
 
-Each of these is one field on `CompilerParams` plus one argument in `GraphQLClientMojo`. Apollo
-already accepts them on `buildCodegenOptions` / `buildIrOptions`; the plugin simply does not pass
-them. Adding several at once is barely more work than adding one.
+The twelve pure pass-through options have been implemented and moved to *Supported* above.
 
-| Apollo option | Language | What it does | Why you would want it |
-|---|---|---|---|
-| `generateMethods` | both | Pick among `equalsHashCode`, `toString`, `copy`, `dataClass` | The most broadly useful gap. Java defaults to `equalsHashCode` + `toString`; Kotlin to `dataClass`. Controls whether models are usable as map keys, in assertions, and in logs |
-| `addUnknownForEnums` | both | Whether generated enums carry an `UNKNOWN` member | Schema evolution. Without it, a value the server adds after your build can blow up deserialisation |
-| `addDefaultArgumentForInputObjects` | both | Default arguments on generated input objects | Much less verbose construction of input types with many optional fields |
-| `generatePrimitiveTypes` | Java | `int`/`double`/`boolean` instead of boxed types | Avoids needless boxing and accidental `null` unboxing in Java models |
-| `classesForEnumsMatching` | Java | Java equivalent of `sealedClassesForEnumsMatching` | Access to the raw enum value for unknown server-side values |
-| `addJvmOverloads` | Kotlin | `@JvmOverloads` on generated constructors | Matters when Java code calls Kotlin-generated classes — a mixed Java/Kotlin codebase |
-| `generateInputBuilders` | Kotlin | Builders for input types *(experimental)* | Constructors require wrapping every optional field in `Optional`; builders avoid that |
-| `requiresOptInAnnotation` | Kotlin | Annotation used for `@requiresOptIn` schema elements | Only if your schema marks elements as requiring opt-in |
-| `generatedSchemaName` | both | Rename the generated `__Schema` class | Cosmetic; only relevant with `generateSchema` |
-| `addTypename` | both | When `__typename` is injected | Default `ifFragments` is almost always right. Change only for an unusual server |
-| `issueSeverities` (full map) | both | Severity per issue type | Today only deprecation is exposed, via `warnOnDeprecatedUsages`. The full map also covers unused fragments and variables |
-| `allowFragmentArguments` | both | Fragment arguments *(experimental)* | Only if your operations use them |
-
-> **Two implementation notes.** New Java-only or Kotlin-only options must follow the existing `isJava`
-> pattern in the mojo and be passed as `null` when they do not apply, or `CodegenOptions.validate()`
-> throws. And `decapitalizeFields` exists on **both** `IrOptions` and `CodegenOptions` — if it is ever
-> exposed, it must be set consistently on both or codegen and IR will disagree.
+One remains unexposed on purpose: `decapitalizeFields` exists on **both** `IrOptions` and
+`CodegenOptions`, so it cannot be added as a single pass-through field — it must be set consistently
+on both or codegen and IR disagree about field names. Small, but not a one-liner.
 
 ### Tier 2 — needs a little machinery
 

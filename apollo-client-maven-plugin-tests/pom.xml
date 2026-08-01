@@ -155,6 +155,20 @@
                                             <targetLanguage>KOTLIN_1_9</targetLanguage>
                                             <sealedClassesForEnumsMatching></sealedClassesForEnumsMatching>
                                             <alwaysGenerateTypesMatching></alwaysGenerateTypesMatching>
+                                            <!--
+                                              Exercises the pass-through options so their Maven
+                                              binding is covered. Maven fails on configuration it
+                                              cannot bind, so this build failing is the signal that
+                                              a type or name is wrong.
+                                            -->
+                                            <generateMethods>
+                                                <generateMethod>DATA_CLASS</generateMethod>
+                                            </generateMethods>
+                                            <addJvmOverloads>true</addJvmOverloads>
+                                            <addTypename>ifFragments</addTypename>
+                                            <issueSeverities>
+                                                <UnusedFragment>Warn</UnusedFragment>
+                                            </issueSeverities>
                                         </compilerParams>
                                     </compilationUnit>
                                     <introspection>
