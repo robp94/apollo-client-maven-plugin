@@ -15,6 +15,7 @@
     <description>Test for maven plugin</description>
     <url>https://github.com/aoudiamoncef/apollo-client-maven-plugin</url>
 
+
     <properties>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
         <maven.install.skip>true</maven.install.skip>
