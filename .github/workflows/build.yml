@@ -10,26 +10,29 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
-    if: "startsWith(github.event.head_commit.message, 'build: releasing version') != true"
+
+    strategy:
+      # Report both JDKs rather than stopping at the first failure; a break on one
+      # version only is exactly the interesting case.
+      fail-fast: false
+      matrix:
+        # 17 is the baseline the project targets. 21 is tested too because build
+        # tooling has broken on newer JDKs before: ktlint 1.16.0 bundled a Kotlin
+        # 1.8 compiler that threw ExceptionInInitializerError on 21.
+        java: [ '17', '21' ]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Set up JDK ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
-          distribution: 'adopt'
-          java-version: 8
-
-      - name: Cache Maven
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          distribution: 'temurin'
+          java-version: ${{ matrix.java }}
+          cache: 'maven'
 
       - name: Build
-        run: mvn --no-transfer-progress -B -U --file pom.xml install
+        run: ./mvnw --no-transfer-progress -B -U verify

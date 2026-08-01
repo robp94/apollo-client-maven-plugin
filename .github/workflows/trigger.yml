@@ -1,5 +1,8 @@
 name: Trigger
 
+# Tags a release, which used to start the Release workflow. That workflow is now
+# manual-only because publishing is not configured for this fork, so running this
+# currently just produces a tag. See docs/apollo-5-migration-plan.md.
 on:
   workflow_dispatch:
     inputs:
@@ -23,18 +26,12 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'adopt'
-          java-version: 8
-
-      - name: Cache Maven
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          distribution: 'temurin'
+          java-version: 17
+          cache: 'maven'
 
       - name: Build
-        run: mvn --no-transfer-progress -B -U --file pom.xml install
+        run: ./mvnw --no-transfer-progress -B -U install
 
   tag:
     name: Tag
@@ -51,15 +48,9 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'adopt'
-          java-version: 8
-
-      - name: Cache Maven
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          distribution: 'temurin'
+          java-version: 17
+          cache: 'maven'
 
       - name: Create tag
         run: |
@@ -68,7 +59,7 @@ jobs:
           VERSION=${{ github.event.inputs.version }}
           echo "Releasing $VERSION from $BRANCH branch"
           git checkout $BRANCH
-          mvn --no-transfer-progress -B versions:set versions:commit -DnewVersion=$VERSION
+          ./mvnw --no-transfer-progress -B versions:set versions:commit -DnewVersion=$VERSION
           git config --global user.email "22281426+aoudiamoncef@users.noreply.github.com"
           git config --global user.name "Automated release"
           git commit -a -m "build: releasing version $VERSION"

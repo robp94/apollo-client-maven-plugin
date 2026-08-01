@@ -1,9 +1,16 @@
 name: Release
 
+# Publishing is not currently configured for this fork. See the decisions table in
+# docs/apollo-5-migration-plan.md.
+#
+# This workflow is kept, but is manual-only rather than firing on a v* tag, so that
+# an accidental tag cannot start a publish that would fail anyway:
+#   - no Sonatype namespace or GPG key is set up for this fork's groupId
+#   - the `publication` profile still uses dokka 0.9.17, which does not work under Kotlin 2
+#
+# Before re-enabling the tag trigger, fix dokka and settle the publishing decision.
 on:
-  push:
-    tags:
-      - v*
+  workflow_dispatch:
 
 jobs:
   release:
@@ -24,8 +31,9 @@ jobs:
       - name: Set up Java for publishing to Maven Central
         uses: actions/setup-java@v4
         with:
-          distribution: 'adopt'
-          java-version: 8
+          distribution: 'temurin'
+          java-version: 17
+          cache: 'maven'
           server-id: central
           server-username: MAVEN_USERNAME
           server-password: MAVEN_CENTRAL_TOKEN
@@ -41,4 +49,4 @@ jobs:
           export GPG_TTY=$(tty)
           git config user.name "${{ github.event.head_commit.committer.name }}"
           git config user.email "${{ github.event.head_commit.committer.email }}"
-          mvn --no-transfer-progress -B --file pom.xml -Dmaven.site.skip=true -Drelease=true dependency:go-offline deploy
+          ./mvnw --no-transfer-progress -B -Dmaven.site.skip=true -Drelease=true dependency:go-offline deploy

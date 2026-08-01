@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": [
+        "maven"
+      ],
+      "matchPackageNames": [
+        "com.apollographql.apollo:**"
+      ],
+      "groupName": "Apollo Kotlin",
+      "prBodyNotes": [
+        "Apollo is the reason this plugin exists, so treat this PR as a real change rather than a routine bump.",
+        "**If the build is red:** across major versions Apollo rewrites the compiler API rather than renaming it. Read `docs/apollo-5-migration-plan.md` for how the last migration went, and `docs/configuration-options.md` for what the plugin currently maps.",
+        "**If `apollo-client-maven-plugin-tests/src/test/golden/` shows a diff:** generated output changed. That is not necessarily wrong. Review the diff, then accept it with `./mvnw test -Dgolden.update=true`.",
+        "**If it fails with a Kotlin metadata error:** Apollo's jars are compiled by a newer Kotlin than `kotlin.version`. The dependency tree will not show this; only a compile does. Raise `kotlin.version` to match."
+      ]
+    },
+    {
+      "matchDatasources": [
+        "maven"
+      ],
+      "matchPackageNames": [
+        "org.jetbrains.kotlin:**"
+      ],
+      "groupName": "Kotlin"
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}
