@@ -110,9 +110,18 @@ Each step should compile before starting the next.
   - `apollo3.compiler.fromJson` no longer exists in v5. The GraphOS registry response is now parsed with the Jackson `ObjectMapper` already present in that file, which also removes a dependency on an Apollo internal and makes the code immune to future Apollo churn.
   - `APOLLO_VERSION` moved to `com.apollographql.apollo.compiler`.
 - [ ] **`util/ConfigUtils.kt`, `util/SchemaDownloader.kt`** — introspection imports → `com.apollographql.apollo.ast.introspection`. Small, isolated, unblocks the rest.
-- [ ] **`config/CompilerParams.kt`, `config/CompilationUnit.kt`** — clean break: delete `generateTestBuilders`, `generateResponseFields`, `operationIdGeneratorClass`, `metadataFiles`, `testDirectory`, `debugDirectory`. Remap survivors onto the three new options classes.
-- [ ] **`GraphQLClientMojo.execute()`** — the real work. Build `InputFile` lists → three options objects → `buildSchemaAndOperationsSources(...)` → `SourceOutput.writeTo(...)`.
-- [ ] **`apollo-client-maven-plugin-tests`** — bump `apollo-runtime`, fix package renames in `Query.kt`, `ApolloClientMavenPluginTest.kt`, `OperationManifestTest.kt`.
+- [x] **`config/CompilerParams.kt`, `config/CompilationUnit.kt`, `config/Codegen.kt`, `util/BuildDirLayout.kt`** — clean break done. Removed: `generateTestBuilders`, `generateDataBuilders`, `generateResponseFields`, `operationIdGeneratorClass`, `generateApolloMetadata`, `metadataFiles`, `metadataOutputFile`, `schemaPackageName`, `rootFolders`, `generateKotlinModels`, `logger`, `testDirectory`, `debugDirectory`. `Codegen.COMPATIBILITY` is gone (Apollo 4 removed the compat model); the enum labels now come from the Apollo constants so an upstream rename fails at compile time.
+- [x] **`GraphQLClientMojo.execute()`** — migrated to `buildSchemaAndOperationsSources(...)` → `SourceOutput.writeTo(...)`.
+  - **Gotcha worth remembering:** `CodegenOptions.validate()` throws if an option belonging to the *other* target language is set at all. Java-only and Kotlin-only options must be passed as `null`, not `false`, when they do not apply.
+  - `warnOnDeprecatedUsages` is now expressed through `issueSeverities`. Warn is already the default, so a severity is only supplied when the user opts out.
+  - Added `MavenApolloLogger`, since `ApolloCompiler.NoOpLogger` is private in v5. Apollo's warnings now reach the Maven log instead of being discarded.
+- [x] **`apollo-client-maven-plugin-tests`** — migrated. `targetLanguage` moved `KOTLIN_1_5` → `KOTLIN_1_9` (`KOTLIN_1_5` is a `DeprecationLevel.ERROR` symbol in v5).
+- [x] **ktlint-maven-plugin 1.16.0 → 3.5.0** — 1.16.0 embeds kotlin-compiler-embeddable 1.8.0, which throws `ExceptionInInitializerError` on JDK 21. Its newer style rules reformatted the sources in the same commit.
+
+### Status: the full reactor builds green and all 3 tests pass
+
+Codegen runs, the generated Kotlin compiles, both queries execute against a live Undertow GraphQL
+server, and the persisted query manifest is written.
 - [ ] **Golden-file codegen test** — snapshot generated sources for the books schema and diff on every build. Highest-leverage item for the "future bumps are cheap" goal: it is what makes each Renovate PR self-verifying.
 - [ ] **README** — plugin ↔ Apollo version table; note that the fork is unpublished and built with `mvn install`; list the removed configuration options.
 
