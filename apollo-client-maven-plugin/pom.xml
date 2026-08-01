@@ -35,18 +35,18 @@
             <artifactId>maven-project</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.apollographql.apollo3</groupId>
+            <groupId>com.apollographql.apollo</groupId>
             <artifactId>apollo-compiler</artifactId>
             <version>${apollo.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.apollographql.apollo3</groupId>
+            <groupId>com.apollographql.apollo</groupId>
             <artifactId>apollo-api-jvm</artifactId>
             <version>${apollo.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.apollographql.apollo3</groupId>
-            <artifactId>apollo-ast</artifactId>
+            <groupId>com.apollographql.apollo</groupId>
+            <artifactId>apollo-ast-jvm</artifactId>
             <version>${apollo.version}</version>
         </dependency>
         <dependency>
