@@ -1,42 +1,62 @@
 = Apollo GraphQL Client Code Generation Maven Plugin
 
-:project-owner:      aoudiamoncef
+:project-owner:      robp94
 :project-name:       apollo-client-maven-plugin
 :project-groupId:    com.github.aoudiamoncef
-:project-artifactId: apollo-client-maven-plugin-parent
-:project-version:    7.0.0
+:project-artifactId: apollo-client-maven-plugin
+:project-version:    7.2.0-SNAPSHOT
+:apollo-version:     5.0.1
 
 image:https://github.com/{project-owner}/{project-name}/workflows/Build/badge.svg["Build Status",link="https://github.com/{project-owner}/{project-name}/actions"]
-image:https://img.shields.io/maven-central/v/{project-groupId}/{project-artifactId}.svg[Download,link="https://search.maven.org/#search|ga|1|g:{project-groupId} AND a:{project-artifactId}"]
-image:https://snyk.io/test/github/{project-owner}/{project-name}/badge.svg[Known Vulnerabilities,link=https://snyk.io/test/github/{project-owner}/{project-name}]
 image:https://img.shields.io/badge/License-MIT-yellow.svg[License: MIT,link=https://opensource.org/licenses/MIT]
 
 Maven plugin that calls the https://github.com/apollographql/apollo-kotlin[Apollo Kotlin compiler] to generate your Java/Kotlin sources.
 
+[IMPORTANT]
+====
+This is a fork of https://github.com/aoudiamoncef/apollo-client-maven-plugin[aoudiamoncef/apollo-client-maven-plugin], updated to **Apollo Kotlin {apollo-version}**.
+
+* **Not published to Maven Central.** Build and install it locally with `./mvnw install`, then depend on version `{project-version}`.
+* **Requires JDK 17 or later.** Apollo 5's compiler needs Kotlin 2.2, which the old JDK 8 baseline could not support.
+* **Options removed in Apollo 4/5 were removed here too**, rather than being silently ignored. A configuration still using one will fail the build with an unknown-parameter error. See link:docs/configuration-options.md[the option reference] for the full list and what replaces each.
+====
+
 == Usage
 
-* A simple usage example can be found in https://github.com/{project-owner}/{project-name}/tree/main/apollo-client-maven-plugin-tests[plugin tests].
+* A working example is in https://github.com/{project-owner}/{project-name}/tree/main/apollo-client-maven-plugin-tests[the plugin tests].
 
-* A complete project with https://github.com/{project-owner}/spring-boot-apollo-graphql[Spring Boot].
+* Full option reference: link:docs/configuration-options.md[docs/configuration-options.md] — supported, removed, and not-yet-supported options.
 
-=== Apollo 2 support
+=== Older Apollo versions
 
-* Go to support https://github.com/aoudiamoncef/apollo-client-maven-plugin/tree/support/apollo-2[branch].
+* Apollo 3 — use the https://github.com/aoudiamoncef/apollo-client-maven-plugin[upstream project].
+* Apollo 2 — use the upstream https://github.com/aoudiamoncef/apollo-client-maven-plugin/tree/support/apollo-2[support/apollo-2 branch].
 
 === Getting Started
 
+. Build and install this plugin, since it is not published:
++
+[source,bash]
+----
+git clone https://github.com/robp94/apollo-client-maven-plugin
+cd apollo-client-maven-plugin
+./mvnw install
+----
+
 . Add the apollo runtime library to your project's dependencies:
 +
-[source,xml]
+[source,xml,subs="attributes+"]
 ----
 <dependencies>
    <dependency>
-       <groupId>com.apollographql.apollo3</groupId>
+       <groupId>com.apollographql.apollo</groupId>
        <artifactId>apollo-runtime</artifactId>
-       <version>3.8.2</version>
+       <version>{apollo-version}</version>
    </dependency>
 </dependencies>
 ----
++
+NOTE: The group id is `com.apollographql.apollo`. Apollo dropped the `3` suffix in version 4.
 
 . Add the code generator plugin to your project's build:
 +
@@ -58,7 +78,7 @@ Maven plugin that calls the https://github.com/apollographql/apollo-kotlin[Apoll
                             <compilationUnit>
                                 <name>example</name>
                                 <compilerParams>
-                                    <schemaPackageName>com.example.graphql.client</schemaPackageName>
+                                    <packageName>com.example.graphql.client</packageName>
                                 </compilerParams>
                             </compilationUnit>
                         </example-api>
@@ -75,28 +95,29 @@ At build time, the plugin will query the server and install this file per the va
 . Create files for each query you'd like to generate classes for under `src/main/graphql/SERVICE_NAME`:
 .. Query file names must match the name of the query they contain
 .. Query files must end with `.graphql` OR `.gql` by default.
-.. Any subdirectories under `src/main/graphql/SERVICE_NAME` are treated as extra package names to append to `schemaPackageName` in the plugin config.
+.. All generated classes go under the single `packageName`. Operations land directly in it, and schema types in a `type` subpackage. Subdirectories under `src/main/graphql/SERVICE_NAME` no longer affect package naming.
 . Run `mvn generate-sources` to generate classes for your queries.
 
-. If you run into compilation issues such as `package com.apollographql.apollo3.api does not exist`, you may need to explicitly add the following runtime libraries to your pom.xml
+. If you run into compilation issues such as `package com.apollographql.apollo.api does not exist`, you may need to explicitly add the following runtime libraries to your pom.xml
 +
-[source,xml]
----
+[source,xml,subs="attributes+"]
+----
 <dependency>
-      <groupId>com.apollographql.apollo3</groupId>
-      <artifactId>apollo-api-jvm</artifactId>
-      <version>3.8.2</version>
+    <groupId>com.apollographql.apollo</groupId>
+    <artifactId>apollo-api-jvm</artifactId>
+    <version>{apollo-version}</version>
 </dependency>
- <dependency>
-    <groupId>com.apollographql.apollo3</groupId>
+<dependency>
+    <groupId>com.apollographql.apollo</groupId>
     <artifactId>apollo-runtime-jvm</artifactId>
-    <version>3.8.2</version>
+    <version>{apollo-version}</version>
 </dependency>
----
+----
 
 === Configuration Options
 
-All plugin configuration properties and their defaults:
+All plugin configuration properties and their defaults. For what each one maps to in Apollo, what was
+removed, and what is not exposed yet, see link:docs/configuration-options.md[docs/configuration-options.md].
 
 [source,xml]
 ----
@@ -113,7 +134,7 @@ All plugin configuration properties and their defaults:
                 <include>**/*.graphql</include>
                 <include>**/*.gql</include>
                 <include>**/*.json</include>
-                <include>**/*.sdl"</include>
+                <include>**/*.sdl</include>
             </includes>
             <excludes></excludes>
             <compilationUnit>
@@ -121,44 +142,29 @@ All plugin configuration properties and their defaults:
                 <outputDirectory>
                     ${project.build.directory}/generated-sources/graphql-client/lahzouz/
                 </outputDirectory>
-                <testDirectory>
-                    ${project.build.directory}/generated-sources/graphql-client/lahzouz/test/
-                </testDirectory>
-                <debugDirectory>
-                    ${project.build.directory}/generated-sources/graphql-client/lahzouz/debug/
-                </debugDirectory>
                 <generateOperationDescriptors>false</generateOperationDescriptors>
                 <compilerParams>
-                    <rootFolders>
-                        <rootFolder>${project.basedir}/src/main/graphql/lahzouz/</rootFolder>
-                    </rootFolders>
-                    <scalarsMapping></scalarsMapping>
-                    <operationIdGeneratorClass></operationIdGeneratorClass>
-                    <operationManifestFormat>persistedQueryManifest</operationManifestFormat>
-                    <schemaPackageName>com.lahzouz.apollo.graphql.client</schemaPackageName>
                     <packageName>com.lahzouz.apollo.graphql.client</packageName>
+                    <targetLanguage>JAVA</targetLanguage>
                     <codegenModels>OPERATION</codegenModels>
+                    <scalarsMapping></scalarsMapping>
+                    <operationManifestFormat>none</operationManifestFormat>
+                    <alwaysGenerateTypesMatching></alwaysGenerateTypesMatching>
                     <flattenModels>true</flattenModels>
-                    <generateApolloMetadata>false</generateApolloMetadata>
+                    <useSemanticNaming>true</useSemanticNaming>
+                    <warnOnDeprecatedUsages>true</warnOnDeprecatedUsages>
+                    <failOnWarnings>false</failOnWarnings>
+                    <generateOptionalOperationVariables>true</generateOptionalOperationVariables>
+                    <generateFragmentImplementations>false</generateFragmentImplementations>
+                    <generateQueryDocument>true</generateQueryDocument>
+                    <generateSchema>false</generateSchema>
+                    <!-- Kotlin only. Setting these with targetLanguage JAVA is ignored. -->
                     <generateAsInternal>false</generateAsInternal>
                     <generateFilterNotNull>false</generateFilterNotNull>
-                    <generateFragmentImplementations>false</generateFragmentImplementations>
-                    <generateKotlinModels>false</generateKotlinModels>
-                    <generateOptionalOperationVariables>false</generateOptionalOperationVariables>
-                    <generateQueryDocument>true</generateQueryDocument>
-                    <generateResponseFields>false</generateResponseFields>
-                    <generateSchema>false</generateSchema>
-                    <generateTestBuilders>false</generateTestBuilders>
-                    <generateDataBuilders>false</generateDataBuilders>
+                    <sealedClassesForEnumsMatching></sealedClassesForEnumsMatching>
+                    <!-- Java only. Setting these with a Kotlin targetLanguage is ignored. -->
                     <generateModelBuilders>false</generateModelBuilders>
                     <nullableFieldStyle>NONE</nullableFieldStyle>
-                    <useSemanticNaming>true</useSemanticNaming>
-                    <targetLanguage>JAVA</targetLanguage>
-                    <sealedClassesForEnumsMatching></sealedClassesForEnumsMatching>
-                    <alwaysGenerateTypesMatching></alwaysGenerateTypesMatching>
-                    <metadataOutputFile>
-                        ${project.build.directory}/generated/metadata/apollo/lahzouz/metadata.json
-                    </metadataOutputFile>
                 </compilerParams>
             </compilationUnit>
             <introspection>
@@ -191,14 +197,18 @@ All plugin configuration properties and their defaults:
 ==== Custom Types
 
 To use https://www.apollographql.com/docs/kotlin/essentials/custom-scalars[custom Scalar Types] you need to
-define mapping configuration then register your custom adapter:
+define mapping configuration then register your custom adapter.
+
+Each entry is keyed by the GraphQL scalar name, and maps it to a `targetName`:
 
 [source,xml]
 ----
 <configuration>
     ...
     <scalarsMapping>
-        <Long>java.time.LocalDate</Long>
+        <Date>
+            <targetName>java.time.LocalDate</targetName>
+        </Date>
     </scalarsMapping>
     ...
 </configuration>
@@ -208,10 +218,10 @@ Implementation of a custom adapter for `java.time.LocalDate`:
 
 [source,java]
 ----
-import com.apollographql.apollo3.api.Adapter;
-import com.apollographql.apollo3.api.CustomScalarAdapters;
-import com.apollographql.apollo3.api.json.JsonReader;
-import com.apollographql.apollo3.api.json.JsonWriter;
+import com.apollographql.apollo.api.Adapter;
+import com.apollographql.apollo.api.CustomScalarAdapters;
+import com.apollographql.apollo.api.json.JsonReader;
+import com.apollographql.apollo.api.json.JsonWriter;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
@@ -234,6 +244,8 @@ public class LocalDateGraphQLAdapter implements Adapter<LocalDate> {
 }
 ----
 
+Register it with `expression`, which is emitted into the generated code as-is:
+
 [source,xml]
 ----
 <configuration>
@@ -250,7 +262,8 @@ public class LocalDateGraphQLAdapter implements Adapter<LocalDate> {
 
 ==== Test Sources
 
-To generate sources for tests:
+To generate sources for tests, point the output at a test directory and swap which source root is added:
+
 [source,xml]
 ----
 <configuration>
@@ -260,14 +273,28 @@ To generate sources for tests:
     <compilationUnit>
         <name>example</name>
         <outputDirectory>${project.basedir}/target/generated-test-sources/apollo/example</outputDirectory>
-        <debugDirectory>${project.basedir}/target/generated-test-sources/apollo/example/debug</debugDirectory>
-        <testDirectory>${project.basedir}/target/generated-test-sources/apollo/example/debug</testDirectory>
-    <compilationUnit/>
+    </compilationUnit>
     ...
 </configuration>
 ----
 
+NOTE: Apollo 4 removed the separate test and debug output trees, so `testDirectory` and `debugDirectory` no longer exist. Everything is emitted into `outputDirectory`.
 
 === Using Apollo Client
 
-See https://www.apollographql.com/docs/kotlin/[documentation]
+See the https://www.apollographql.com/docs/kotlin/[Apollo Kotlin documentation].
+
+== Development
+
+[source,bash]
+----
+./mvnw verify                      # full build and tests
+./mvnw test -Dgolden.update=true   # accept intentional changes to generated output
+----
+
+Requires JDK 17+. CI runs 17 and 21.
+
+Generated sources are pinned by a golden-file test, so a change in what the Apollo compiler emits
+shows up as a reviewable diff rather than passing silently. See link:CLAUDE.md[CLAUDE.md] for
+architecture notes and link:docs/apollo-5-migration-plan.md[docs/apollo-5-migration-plan.md] for the
+migration history and remaining work.

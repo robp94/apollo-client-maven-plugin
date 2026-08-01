@@ -2,6 +2,35 @@
 
 As a contributor, here are the guidelines we would like you to follow:
 
+== Building
+
+Requires *JDK 17 or later*. Always use the Maven wrapper rather than a system `mvn`, so everyone
+builds with the same Maven version:
+
+[source,bash]
+----
+   ./mvnw verify
+----
+
+CI builds on JDK 17 and 21.
+
+=== Generated sources are pinned
+
+`GeneratedSourcesGoldenTest` compares the plugin's generated output against a checked-in snapshot in
+`apollo-client-maven-plugin-tests/src/test/golden/`. This is what catches an Apollo upgrade quietly
+changing generated code that still happens to compile.
+
+If your change intentionally alters generated output, review the diff, then accept it with:
+
+[source,bash]
+----
+   ./mvnw test -Dgolden.update=true
+----
+
+Never accept a golden diff without reading it first — that defeats the only purpose of the test.
+
+See link:CLAUDE.md[CLAUDE.md] for architecture notes and the Apollo API surface this plugin depends on.
+
 ==  Commit Message Guidelines
 
 We have very precise rules over how our git commit messages can be formatted. This leads to *more
@@ -113,11 +142,20 @@ IMPORTANT: Create a new pull request on Github (only if Github don't find any co
 
 == Code formatter
 
-. Install https://github.com/pinterest/ktlint[Klint].
+ktlint runs automatically on every build through the `format` profile, so committed code is formatted
+for you. There is no need to hand-format, and no need to install ktlint just to contribute.
 
-. Apply Ktlint settings:
+To make your IDE match the same rules:
+
+. Install https://github.com/pinterest/ktlint[ktlint].
+
+. Apply the ktlint settings:
 
 [source,bash]
 ----
    ktlint applyToIDEAProject
 ----
+
+NOTE: Generated sources are excluded from formatting (`includeSources=false` for ktlint in the tests
+module). Formatting generated code would tie the golden snapshot to the ktlint version rather than to
+the Apollo compiler's actual output.
