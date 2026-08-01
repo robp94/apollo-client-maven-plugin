@@ -61,7 +61,7 @@
         <version.failsafe.plugin>3.2.2</version.failsafe.plugin>
         <version.git.plugin>4.9.10</version.git.plugin>
         <version.gpg.plugin>3.0.1</version.gpg.plugin>
-        <version.install.plugin>3.1.1</version.install.plugin>
+        <version.install.plugin>3.1.4</version.install.plugin>
         <version.jar.plugin>3.3.0</version.jar.plugin>
         <version.javadoc.plugin>3.5.0</version.javadoc.plugin>
         <version.license.plugin>4.2</version.license.plugin>
