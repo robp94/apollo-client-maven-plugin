@@ -56,12 +56,6 @@ object ConfigUtils {
         if (compilationUnit.outputDirectory == null) {
             compilationUnit.outputDirectory = BuildDirLayout.sources(project, compilationUnit)
         }
-        if (compilationUnit.debugDirectory == null) {
-            compilationUnit.debugDirectory = BuildDirLayout.debug(project, compilationUnit)
-        }
-        if (compilationUnit.testDirectory == null) {
-            compilationUnit.testDirectory = BuildDirLayout.test(project, compilationUnit)
-        }
 
         return compilationUnit
     }
@@ -101,27 +95,8 @@ object ConfigUtils {
         service: Service,
         compilerParams: CompilerParams,
     ): CompilerParams {
-        compilerParams.rootFolders =
-            if (compilerParams.rootFolders.isNotEmpty()) compilerParams.rootFolders else listOf(service.sourceFolder as File)
-
-        if (compilerParams.metadataOutputFile == null) {
-            compilerParams.metadataOutputFile = BuildDirLayout.metadata(project, service.compilationUnit)
-        }
-
-        if (compilerParams.generateApolloMetadata && compilerParams.alwaysGenerateTypesMatching.isEmpty()) {
-            compilerParams.alwaysGenerateTypesMatching = setOf(".*")
-        }
-
         if (compilerParams.packageName.isNullOrBlank()) {
-            if (compilerParams.schemaPackageName.isNotBlank()) {
-                compilerParams.packageName = compilerParams.schemaPackageName.removeSuffix("schema").plus("operation")
-            } else {
-                compilerParams.packageName = "${project.groupId}.apollo.client.${service.compilationUnit.name}.operation"
-            }
-        }
-
-        if (compilerParams.schemaPackageName.isBlank()) {
-            compilerParams.schemaPackageName = "${project.groupId}.apollo.client.${service.compilationUnit.name}.schema"
+            compilerParams.packageName = "${project.groupId}.apollo.client.${service.compilationUnit.name}"
         }
 
         return compilerParams

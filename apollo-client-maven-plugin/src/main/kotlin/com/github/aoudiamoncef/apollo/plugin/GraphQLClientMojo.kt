@@ -1,7 +1,14 @@
 package com.github.aoudiamoncef.apollo.plugin
 
-import com.apollographql.apollo3.compiler.*
-import com.apollographql.apollo3.compiler.introspection.toSchema
+import com.apollographql.apollo.ast.DeprecatedUsage
+import com.apollographql.apollo.compiler.ApolloCompiler
+import com.apollographql.apollo.compiler.CodegenSchemaOptions
+import com.apollographql.apollo.compiler.IssueSeverity
+import com.apollographql.apollo.compiler.TargetLanguage
+import com.apollographql.apollo.compiler.buildCodegenOptions
+import com.apollographql.apollo.compiler.buildIrOptions
+import com.apollographql.apollo.compiler.codegen.writeTo
+import com.apollographql.apollo.compiler.toInputFiles
 import com.github.aoudiamoncef.apollo.plugin.config.CompilationUnit
 import com.github.aoudiamoncef.apollo.plugin.config.Introspection
 import com.github.aoudiamoncef.apollo.plugin.config.Service
@@ -9,6 +16,7 @@ import com.github.aoudiamoncef.apollo.plugin.util.ConfigUtils
 import com.github.aoudiamoncef.apollo.plugin.util.SchemaDownloader
 import org.apache.maven.plugin.AbstractMojo
 import org.apache.maven.plugin.MojoExecutionException
+import org.apache.maven.plugin.logging.Log
 import org.apache.maven.plugins.annotations.LifecyclePhase
 import org.apache.maven.plugins.annotations.Mojo
 import org.apache.maven.plugins.annotations.Parameter
@@ -130,60 +138,67 @@ class GraphQLClientMojo : AbstractMojo() {
                     .takeIf { set -> set.isNotEmpty() }
                     ?: throw MojoExecutionException("No querie(s)/fragment(s) found")
 
-            val operationOutputGenerator = if (compilerParams.operationIdGeneratorClass.isEmpty()) {
-                OperationOutputGenerator.Default(OperationIdGenerator.Sha256)
-            } else {
-                val operationIdGenerator =
-                    Class.forName(compilerParams.operationIdGeneratorClass).newInstance() as OperationIdGenerator
-                OperationOutputGenerator.Default(operationIdGenerator)
-            }
+            val isJava = compilerParams.targetLanguage == TargetLanguage.JAVA
 
-            val metadata = compilerParams.metadataFiles.toList().map { ApolloMetadata.readFrom(it).compilerMetadata }
-
-            val scalarMapping = compilerParams.scalarsMapping
-                .mapValues { scalarMapping ->
-                    when (val expression = scalarMapping.value.expression) {
-                        null -> ScalarInfo(scalarMapping.value.targetName)
-                        else -> ScalarInfo(scalarMapping.value.targetName, ExpressionAdapterInitializer(expression))
-                    }
-                }
-
-            ApolloCompiler.write(
-                Options(
-                    schema = resolveSchema!!.toSchema(),
-                    outputDir = compilationUnit.outputDirectory as File,
-                    testDir = compilationUnit.testDirectory as File,
-                    debugDir = compilationUnit.debugDirectory as File,
-                    executableFiles = graphqlFiles,
-                    schemaPackageName = compilerParams.schemaPackageName,
-                    packageNameGenerator = PackageNameGenerator.Flat(compilerParams.packageName as String),
-                    alwaysGenerateTypesMatching = compilerParams.alwaysGenerateTypesMatching,
-                    operationOutputGenerator = operationOutputGenerator,
-                    incomingCompilerMetadata = metadata,
-                    scalarMapping = scalarMapping,
-                    codegenModels = compilerParams.codegenModels.label,
-                    flattenModels = compilerParams.flattenModels,
-                    useSemanticNaming = compilerParams.useSemanticNaming,
-                    warnOnDeprecatedUsages = compilerParams.warnOnDeprecatedUsages,
-                    failOnWarnings = compilerParams.failOnWarnings,
-                    logger = compilerParams.logger,
-                    generateAsInternal = compilerParams.generateAsInternal,
-                    generateFilterNotNull = compilerParams.generateFilterNotNull,
-                    generateFragmentImplementations = compilerParams.generateFragmentImplementations,
-                    operationManifestFormat = compilerParams.operationManifestFormat,
-                    operationManifestFile = compilationUnit.operationOutputFile,
-                    generateResponseFields = compilerParams.generateResponseFields,
-                    generateQueryDocument = compilerParams.generateQueryDocument,
-                    generateSchema = compilerParams.generateSchema,
-                    targetLanguage = compilerParams.targetLanguage,
-                    generateTestBuilders = compilerParams.generateTestBuilders,
-                    generateModelBuilders = compilerParams.generateModelBuilders,
-                    generateDataBuilders = compilerParams.generateDataBuilders,
-                    nullableFieldStyle = compilerParams.nullableFieldStyle,
-                    sealedClassesForEnumsMatching = compilerParams.sealedClassesForEnumsMatching,
-                    generateOptionalOperationVariables = compilerParams.generateOptionalOperationVariables,
-                ),
+            val codegenSchemaOptions = CodegenSchemaOptions(
+                scalarTypeMapping = compilerParams.scalarsMapping.mapValues { it.value.targetName },
+                scalarAdapterMapping = compilerParams.scalarsMapping
+                    .filterValues { mapping -> mapping.expression != null }
+                    .mapValues { it.value.expression!! },
+                generateDataBuilders = false,
             )
+
+            val irOptions = buildIrOptions(
+                alwaysGenerateTypesMatching = compilerParams.alwaysGenerateTypesMatching,
+                codegenModels = compilerParams.codegenModels.label,
+                flattenModels = compilerParams.flattenModels,
+                failOnWarnings = compilerParams.failOnWarnings,
+                generateOptionalOperationVariables = compilerParams.generateOptionalOperationVariables,
+                // `warnOnDeprecatedUsages` no longer exists as a flag; deprecation is one of several
+                // issues whose severity is configurable. Warn is already the compiler default, so we
+                // only need to say something when the user opted out.
+                issueSeverity = if (compilerParams.warnOnDeprecatedUsages) {
+                    null
+                } else {
+                    mapOf(DeprecatedUsage::class.simpleName!! to IssueSeverity.Ignore)
+                },
+            )
+
+            // `CodegenOptions.validate()` throws if an option belonging to the other target language
+            // is set at all, so these must be null rather than false when they do not apply.
+            val codegenOptions = buildCodegenOptions(
+                targetLanguage = compilerParams.targetLanguage,
+                packageName = compilerParams.packageName,
+                useSemanticNaming = compilerParams.useSemanticNaming,
+                operationManifestFormat = compilerParams.operationManifestFormat,
+                generateFragmentImplementations = compilerParams.generateFragmentImplementations,
+                generateQueryDocument = compilerParams.generateQueryDocument,
+                generateSchema = compilerParams.generateSchema,
+                generateModelBuilders = if (isJava) compilerParams.generateModelBuilders else null,
+                nullableFieldStyle = if (isJava) compilerParams.nullableFieldStyle else null,
+                generateAsInternal = if (isJava) null else compilerParams.generateAsInternal,
+                generateFilterNotNull = if (isJava) null else compilerParams.generateFilterNotNull,
+                sealedClassesForEnumsMatching = if (isJava) null else compilerParams.sealedClassesForEnumsMatching,
+            )
+
+            val sourceOutput = ApolloCompiler.buildSchemaAndOperationsSources(
+                schemaFiles = listOf(resolveSchema!!).toInputFiles(),
+                executableFiles = graphqlFiles.toInputFiles(),
+                codegenSchemaOptions = codegenSchemaOptions,
+                irOptions = irOptions,
+                codegenOptions = codegenOptions,
+                layoutFactory = null,
+                operationIdsGenerator = null,
+                irOperationsTransform = null,
+                javaOutputTransform = null,
+                kotlinOutputTransform = null,
+                documentTransform = null,
+                schemaDocumentTransform = null,
+                logger = MavenApolloLogger(log),
+                operationManifestFile = compilationUnit.operationOutputFile,
+            )
+
+            sourceOutput.writeTo(compilationUnit.outputDirectory as File, true, null)
 
             if (service.addSourceRoot) {
                 val generatedSourcePath = compilationUnit.outputDirectory?.canonicalPath
@@ -202,5 +217,22 @@ class GraphQLClientMojo : AbstractMojo() {
         val finish = System.nanoTime()
         val timeElapsed = (finish - start).toDouble() / 1000000000
         log.info("Total time: ${String.format("%.3f", timeElapsed)} s")
+    }
+
+    /**
+     * Bridges the Apollo compiler's diagnostics onto the Maven log.
+     *
+     * Apollo 5 made its own `NoOpLogger` private, so a logger has to be supplied. Routing it to the
+     * Maven log means schema warnings and deprecation notices surface in the build output instead of
+     * being discarded, which is what the previous no-op logger did.
+     */
+    private class MavenApolloLogger(private val log: Log) : ApolloCompiler.Logger {
+        override fun debug(message: String) = log.debug(message)
+
+        override fun info(message: String) = log.info(message)
+
+        override fun warning(message: String) = log.warn(message)
+
+        override fun error(message: String) = log.error(message)
     }
 }
