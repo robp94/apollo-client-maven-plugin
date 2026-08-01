@@ -16,7 +16,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
-        <kotlin.version>1.9.21</kotlin.version>
+        <kotlin.version>2.2.0</kotlin.version>
         <java.version>17</java.version>
         <!--This contends with dokka and creates two javadoc jars...-->
         <maven.javadoc.skip>true</maven.javadoc.skip>
@@ -378,11 +378,6 @@
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
-                <configuration>
-                    <args>
-                        <arg>-Xuse-ir</arg>
-                    </args>
-                </configuration>
                 <executions>
                     <execution>
                         <id>compile</id>

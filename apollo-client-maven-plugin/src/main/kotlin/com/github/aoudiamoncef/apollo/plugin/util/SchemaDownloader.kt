@@ -1,6 +1,5 @@
 package com.github.aoudiamoncef.apollo.plugin.util
 
-import com.apollographql.apollo3.compiler.fromJson
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.aoudiamoncef.apollo.plugin.util.ConfigUtils.isIntrospection
@@ -73,7 +72,7 @@ object SchemaDownloader {
                 }
             }
             .header("apollographql-client-name", "apollo-maven-plugin")
-            .header("apollographql-client-version", com.apollographql.apollo3.compiler.APOLLO_VERSION)
+            .header("apollographql-client-version", com.apollographql.apollo.compiler.APOLLO_VERSION)
             .url(url)
             .build()
 
@@ -133,13 +132,15 @@ object SchemaDownloader {
         val responseString = response.body.use { it?.string() }
 
         val document = responseString
-            ?.fromJson<Map<String, *>>()
-            ?.get("data").cast<Map<String, *>>()
-            ?.get("service").cast<Map<String, *>>()
-            ?.get("variant").cast<Map<String, *>>()
-            ?.get("activeSchemaPublish").cast<Map<String, *>>()
-            ?.get("schema").cast<Map<String, *>>()
-            ?.get("document").cast<String>()
+            ?.let { mapper.readTree(it) }
+            ?.path("data")
+            ?.path("service")
+            ?.path("variant")
+            ?.path("activeSchemaPublish")
+            ?.path("schema")
+            ?.path("document")
+            ?.takeIf { it.isTextual }
+            ?.asText()
 
         check(document != null) {
             "Cannot retrieve document from $responseString\nCheck graph id and variant"
@@ -147,8 +148,6 @@ object SchemaDownloader {
 
         writeResponse(schema, document, prettyPrint)
     }
-
-    private inline fun <reified T> Any?.cast() = this as? T
 
     private fun writeResponse(schema: File, response: Response, prettyPrint: Boolean) {
         schema.parentFile?.mkdirs()

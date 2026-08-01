@@ -1,11 +1,5 @@
 package com.github.aoudiamoncef.apollo.plugin.util
 
-import com.apollographql.apollo3.annotations.ApolloExperimental
-import com.apollographql.apollo3.ast.toUtf8
-import com.apollographql.apollo3.compiler.introspection.toGQLDocument
-import com.apollographql.apollo3.compiler.introspection.toIntrospectionSchema
-import com.apollographql.apollo3.compiler.introspection.toSchema
-import com.apollographql.apollo3.compiler.toJson
 import com.github.aoudiamoncef.apollo.plugin.config.CompilationUnit
 import com.github.aoudiamoncef.apollo.plugin.config.CompilerParams
 import com.github.aoudiamoncef.apollo.plugin.config.Introspection
@@ -204,13 +198,4 @@ object ConfigUtils {
     }
 
     fun File.isIntrospection() = extension == "json"
-
-    @OptIn(ApolloExperimental::class)
-    fun convert(from: File, to: File, prettyPrint: Boolean) {
-        if (from.isIntrospection()) {
-            from.toIntrospectionSchema().toGQLDocument().toUtf8(to)
-        } else {
-            from.toSchema().toIntrospectionSchema().toJson(to)
-        }
-    }
 }

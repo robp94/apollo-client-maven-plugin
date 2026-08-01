@@ -76,18 +76,39 @@ com.apollographql.apollo:apollo-compiler:5.0.1
 └─ org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.8.1 (runtime)
 ```
 
-**Finding that changes Stage 1:** the tree pulls **kotlin-stdlib 1.9.0**, not 2.x. That matches
-`apollo-compiler`'s own build, which pins language level `KOTLIN_1_9`. **Apollo 5 does not force a
-Kotlin 2 upgrade.** Keep `kotlin.version` at 1.9.21 for the first pass so the Apollo migration is
-isolated from a Kotlin upgrade; bump Kotlin as a separate, later change with its own PR. This also
-defers the dokka problem, since dokka 0.9.17 only breaks under Kotlin 2.
+**Apollo 5 requires Kotlin 2.2+.** An earlier reading of this tree concluded the opposite, because
+`apollo-compiler` declares `kotlin-stdlib:1.9.0` and pins its own language level to `KOTLIN_1_9`.
+Both are misleading: the language-level pin governs *source* features, and the declared stdlib is
+only a floor. What actually matters is the **binary metadata version** of the jars, which the
+dependency tree does not show:
+
+| Artifact | Metadata version |
+|---|---|
+| `apollo-ast-jvm`, `apollo-api-jvm` | 2.1.0 |
+| `kotlinpoet-jvm` 2.2.0 | 2.1.0 |
+| `kotlinx-serialization-core-jvm` 1.8.1 | 2.1.0 |
+| `okio-jvm` 3.16.2 | **2.2.0** |
+
+Kotlin 1.9.21 reads metadata up to 2.0.0 only, so it fails on all of them. **okio pushes the floor
+to Kotlin 2.2** — 2.1 is not sufficient. `kotlin.version` is therefore 2.2.0, and `-Xuse-ir`
+(removed in Kotlin 2) is gone.
+
+Lesson worth keeping: `dependency:tree` cannot answer "which Kotlin do I need". Only a compile can.
+
+**dokka 0.9.17 is now a latent problem** — it will not work under Kotlin 2, but it only runs in the
+`publication` profile, which activates on `-Drelease`. Since we are not publishing, it stays
+dormant. It must be fixed before any publishing decision is revisited.
 
 ## Stage 1 — Port existing features to 5.0.1
 
 Each step should compile before starting the next.
 
-- [x] **POM** — `apollo.version` → `5.0.1`; groupId `com.apollographql.apollo3` → `com.apollographql.apollo`; `java.version` → 17; `apollo-ast` → `apollo-ast-jvm` (matching what apollo-compiler's own POM depends on). Kotlin left at 1.9.21 and dokka untouched per the Stage 0 finding. **Verified: all dependencies resolve, zero resolution errors — every remaining failure is source-level.**
-  - [ ] Still open, deferred to the cleanup step: drop `-Xuse-ir`; drop moshi if apollo-ast's JSON reader covers `SchemaDownloader`; check whether `apollo-api-jvm` is still needed by the plugin module at all.
+- [x] **POM** — `apollo.version` → `5.0.1`; groupId `com.apollographql.apollo3` → `com.apollographql.apollo`; `java.version` → 17; `apollo-ast` → `apollo-ast-jvm` (matching what apollo-compiler's own POM depends on); `kotlin.version` → 2.2.0; `-Xuse-ir` removed. **Verified: all dependencies resolve and all metadata is readable.**
+  - [ ] Still open, deferred to the cleanup step: drop moshi if apollo-ast's JSON reader covers `SchemaDownloader`; check whether `apollo-api-jvm` is still needed by the plugin module at all; fix dokka before any publishing decision.
+- [x] **`util/ConfigUtils.kt`, `util/SchemaDownloader.kt`** — both compile clean.
+  - `ConfigUtils.convert()` had no callers anywhere in the repo and was deleted rather than migrated. It was also the hardest piece to port, chaining four introspection helpers that all moved or changed.
+  - `apollo3.compiler.fromJson` no longer exists in v5. The GraphOS registry response is now parsed with the Jackson `ObjectMapper` already present in that file, which also removes a dependency on an Apollo internal and makes the code immune to future Apollo churn.
+  - `APOLLO_VERSION` moved to `com.apollographql.apollo.compiler`.
 - [ ] **`util/ConfigUtils.kt`, `util/SchemaDownloader.kt`** — introspection imports → `com.apollographql.apollo.ast.introspection`. Small, isolated, unblocks the rest.
 - [ ] **`config/CompilerParams.kt`, `config/CompilationUnit.kt`** — clean break: delete `generateTestBuilders`, `generateResponseFields`, `operationIdGeneratorClass`, `metadataFiles`, `testDirectory`, `debugDirectory`. Remap survivors onto the three new options classes.
 - [ ] **`GraphQLClientMojo.execute()`** — the real work. Build `InputFile` lists → three options objects → `buildSchemaAndOperationsSources(...)` → `SourceOutput.writeTo(...)`.
