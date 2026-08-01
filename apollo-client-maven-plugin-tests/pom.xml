@@ -166,6 +166,7 @@
                                             </generateMethods>
                                             <addJvmOverloads>true</addJvmOverloads>
                                             <addTypename>ifFragments</addTypename>
+                                            <generateDataBuilders>true</generateDataBuilders>
                                             <issueSeverities>
                                                 <UnusedFragment>Warn</UnusedFragment>
                                             </issueSeverities>

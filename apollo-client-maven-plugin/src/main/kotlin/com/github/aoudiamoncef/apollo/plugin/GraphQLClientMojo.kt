@@ -1,14 +1,16 @@
 package com.github.aoudiamoncef.apollo.plugin
 
+import com.apollographql.apollo.annotations.ApolloExperimental
 import com.apollographql.apollo.ast.DeprecatedUsage
 import com.apollographql.apollo.compiler.ApolloCompiler
 import com.apollographql.apollo.compiler.CodegenSchemaOptions
+import com.apollographql.apollo.compiler.InputFile
 import com.apollographql.apollo.compiler.IssueSeverity
 import com.apollographql.apollo.compiler.TargetLanguage
+import com.apollographql.apollo.compiler.UsedCoordinates
 import com.apollographql.apollo.compiler.buildCodegenOptions
 import com.apollographql.apollo.compiler.buildIrOptions
 import com.apollographql.apollo.compiler.codegen.writeTo
-import com.apollographql.apollo.compiler.toInputFiles
 import com.github.aoudiamoncef.apollo.plugin.config.CompilationUnit
 import com.github.aoudiamoncef.apollo.plugin.config.CompilerParams
 import com.github.aoudiamoncef.apollo.plugin.config.Introspection
@@ -58,6 +60,7 @@ class GraphQLClientMojo : AbstractMojo() {
     @Parameter
     private lateinit var services: Map<String, Service>
 
+    @OptIn(ApolloExperimental::class)
     @Throws(MojoExecutionException::class)
     override fun execute() {
         val start = System.nanoTime()
@@ -151,7 +154,7 @@ class GraphQLClientMojo : AbstractMojo() {
                         compilerParams.scalarsMapping
                             .filterValues { mapping -> mapping.expression != null }
                             .mapValues { it.value.expression!! },
-                    generateDataBuilders = false,
+                    generateDataBuilders = compilerParams.generateDataBuilders,
                 )
 
             val irOptions =
@@ -171,7 +174,6 @@ class GraphQLClientMojo : AbstractMojo() {
             val codegenOptions =
                 buildCodegenOptions(
                     targetLanguage = compilerParams.targetLanguage,
-                    packageName = compilerParams.packageName,
                     useSemanticNaming = compilerParams.useSemanticNaming,
                     operationManifestFormat = compilerParams.operationManifestFormat,
                     generateFragmentImplementations = compilerParams.generateFragmentImplementations,
@@ -181,6 +183,8 @@ class GraphQLClientMojo : AbstractMojo() {
                     addUnknownForEnums = compilerParams.addUnknownForEnums,
                     addDefaultArgumentForInputObjects = compilerParams.addDefaultArgumentForInputObjects,
                     generatedSchemaName = compilerParams.generatedSchemaName,
+                    packageName = compilerParams.packageName?.takeIf { it.isNotBlank() },
+                    rootPackageName = compilerParams.rootPackageName?.takeIf { it.isNotBlank() },
                     generateModelBuilders = if (isJava) compilerParams.generateModelBuilders else null,
                     nullableFieldStyle = if (isJava) compilerParams.nullableFieldStyle else null,
                     generatePrimitiveTypes = if (isJava) compilerParams.generatePrimitiveTypes else null,
@@ -193,23 +197,65 @@ class GraphQLClientMojo : AbstractMojo() {
                     requiresOptInAnnotation = if (isJava) null else compilerParams.requiresOptInAnnotation,
                 )
 
-            val sourceOutput =
-                ApolloCompiler.buildSchemaAndOperationsSources(
-                    schemaFiles = listOf(resolveSchema!!).toInputFiles(),
-                    executableFiles = graphqlFiles.toInputFiles(),
+            val sourceFolder = service.sourceFolder as File
+            val logger = MavenApolloLogger(log)
+
+            // These three calls are what ApolloCompiler.buildSchemaAndOperationsSources does
+            // internally. They are spelled out because data builders need the intermediate
+            // codegenSchema and the used coordinates from the IR, which the convenience overload
+            // does not hand back.
+            val codegenSchema =
+                ApolloCompiler.buildCodegenSchema(
+                    schemaFiles = listOf(InputFile(resolveSchema!!, ConfigUtils.normalizedPath(resolveSchema, sourceFolder))),
+                    logger = logger,
                     codegenSchemaOptions = codegenSchemaOptions,
-                    irOptions = irOptions,
+                    foreignSchemas = emptyList(),
+                    schemaTransform = null,
+                )
+
+            val irOperations =
+                ApolloCompiler.buildIrOperations(
+                    codegenSchema = codegenSchema,
+                    executableFiles = graphqlFiles.map { InputFile(it, ConfigUtils.normalizedPath(it, sourceFolder)) },
+                    upstreamCodegenModels = emptyList(),
+                    upstreamFragmentDefinitions = emptyList(),
+                    options = irOptions,
+                    documentTransform = null,
+                    logger = logger,
+                )
+
+            val schemaAndOperations =
+                ApolloCompiler.buildSchemaAndOperationsSourcesFromIr(
+                    codegenSchema = codegenSchema,
+                    irOperations = irOperations,
+                    downstreamUsedCoordinates = UsedCoordinates(),
+                    upstreamCodegenMetadata = emptyList(),
                     codegenOptions = codegenOptions,
-                    layoutFactory = null,
+                    layout = null,
                     operationIdsGenerator = null,
                     irOperationsTransform = null,
                     javaOutputTransform = null,
                     kotlinOutputTransform = null,
-                    documentTransform = null,
-                    schemaDocumentTransform = null,
-                    logger = MavenApolloLogger(log),
                     operationManifestFile = compilationUnit.operationOutputFile,
                 )
+
+            val sourceOutput =
+                if (compilerParams.generateDataBuilders) {
+                    log.info("Generating data builders for service: ${it.key}")
+                    // Data builders reference the scalar targets and class names registered while
+                    // generating the schema, so the metadata from that pass has to be handed in as
+                    // upstream. Without it codegen fails with "Cannot resolve scalar target".
+                    schemaAndOperations +
+                        ApolloCompiler.buildDataBuilders(
+                            codegenSchema = codegenSchema,
+                            usedCoordinates = irOperations.usedCoordinates,
+                            codegenOptions = codegenOptions,
+                            layout = null,
+                            upstreamCodegenMetadata = listOf(schemaAndOperations.codegenMetadata),
+                        )
+                } else {
+                    schemaAndOperations
+                }
 
             sourceOutput.writeTo(compilationUnit.outputDirectory as File, true, null)
 

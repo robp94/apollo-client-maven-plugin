@@ -94,6 +94,24 @@ class CompilerParams {
     internal var packageName: String? = ""
 
     /**
+     * Derive package names from each file's path relative to the service `sourceFolder`, prefixed
+     * with this value. For example a query in `queries/author/` becomes
+     * `<rootPackageName>.queries.author`.
+     *
+     * Mutually exclusive with [packageName], which takes precedence when both are set. Leave
+     * [packageName] unset to use this.
+     */
+    internal val rootPackageName: String? = null
+
+    /**
+     * Whether to generate data builders: type-safe builders for constructing fake responses, useful
+     * for tests without hand-writing JSON.
+     *
+     * Default value: false
+     */
+    internal val generateDataBuilders: Boolean = false
+
+    /**
      * Whether to generate default implementation classes for GraphQL fragments.
      * Default value is `false`, means only interfaces are been generated.
      *

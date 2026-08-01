@@ -98,12 +98,35 @@ object ConfigUtils {
         service: Service,
         compilerParams: CompilerParams,
     ): CompilerParams {
-        if (compilerParams.packageName.isNullOrBlank()) {
+        // Apollo requires exactly one of packageName or rootPackageName, and packageName wins when
+        // both are set. Only fall back to a generated packageName when rootPackageName was not
+        // configured, otherwise the default would silently make rootPackageName do nothing.
+        if (compilerParams.packageName.isNullOrBlank() && compilerParams.rootPackageName.isNullOrBlank()) {
             compilerParams.packageName = "${project.groupId}.apollo.client.${service.compilationUnit.name}"
         }
 
         return compilerParams
     }
+
+    /**
+     * The path of [file] relative to [sourceFolder], using `/` separators.
+     *
+     * Apollo derives package names from this when `rootPackageName` is used, so it must be a forward
+     * slash relative path on every platform. Falls back to the file name if the file lies outside
+     * [sourceFolder], which can happen for a schema referenced by an absolute `schemaPath`.
+     */
+    internal fun normalizedPath(
+        file: File,
+        sourceFolder: File,
+    ): String =
+        runCatching {
+            sourceFolder
+                .toPath()
+                .toAbsolutePath()
+                .normalize()
+                .relativize(file.toPath().toAbsolutePath().normalize())
+                .joinToString("/")
+        }.getOrElse { file.name }
 
     internal fun findFilesByMatcher(
         files: Set<File>,

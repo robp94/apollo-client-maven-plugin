@@ -48,7 +48,9 @@ The Apollo column shows which of the three v5 options objects each value feeds.
 
 | Option | Type | Default | Apollo 5 target |
 |---|---|---|---|
-| `packageName` | string | `<groupId>.apollo.client.<name>` | `CodegenOptions.packageName` |
+| `packageName` | string | `<groupId>.apollo.client.<name>` unless `rootPackageName` is set | `CodegenOptions.packageName` |
+| `rootPackageName` | string | *(unset)* | `CodegenOptions.rootPackageName` |
+| `generateDataBuilders` | boolean | `false` | `CodegenSchemaOptions` + a second compiler pass |
 | `targetLanguage` | `JAVA` \| `KOTLIN_1_9` | `JAVA` | `CodegenOptions.targetLanguage` |
 | `codegenModels` | `OPERATION` \| `RESPONSE` \| `OPERATION_WITH_INTERFACES` | `OPERATION` | `IrOptions.codegenModels` |
 | `scalarsMapping` | map of `targetName` + optional `expression` | *(empty)* | `CodegenSchemaOptions.scalarTypeMapping` and `scalarAdapterMapping` |
@@ -83,6 +85,16 @@ The Apollo column shows which of the three v5 options objects each value feeds.
 > **Why some defaults say *(Apollo default)*.** Those options are unset unless you configure them, so
 > Apollo's own default applies. Repeating Apollo's default here would freeze the plugin on whatever it
 > happened to be when the option was added, and quietly diverge on the next upgrade.
+
+> **`packageName` and `rootPackageName` are alternatives.** Apollo requires exactly one, and
+> `packageName` wins when both are set. Use `rootPackageName` to derive packages from directory
+> layout: with `rootPackageName` of `com.example`, a query in `queries/author/` generates into
+> `com.example.queries.author`. Paths are taken relative to the service `sourceFolder`. The generated
+> `packageName` default is only applied when `rootPackageName` is unset.
+
+> **`generateDataBuilders` emits a `builder` subpackage** next to your operations, containing a
+> builder and a map per composite type plus a `resolver` package. They construct fake responses for
+> tests without hand-writing JSON.
 
 > **`issueSeverities` and `warnOnDeprecatedUsages` overlap.** `warnOnDeprecatedUsages` is the coarse
 > switch for one issue type; `issueSeverities` addresses any of them by class name — `DeprecatedUsage`,
@@ -163,14 +175,21 @@ One remains unexposed on purpose: `decapitalizeFields` exists on **both** `IrOpt
 `CodegenOptions`, so it cannot be added as a single pass-through field — it must be set consistently
 on both or codegen and IR disagree about field names. Small, but not a one-liner.
 
-### Tier 2 — needs a little machinery
+### Tier 2 — done
 
-Still small, but not pure plumbing.
+Both items have been implemented and moved to *Supported* above. What they needed, for reference:
 
-| Apollo feature | What it does | Why it is more work |
-|---|---|---|
-| `generateDataBuilders` | Type-safe builders for constructing fake responses — the replacement for the removed test builders | The flag on `CodegenSchemaOptions` is not enough. Emitting them needs a separate `ApolloCompiler.buildDataBuilders(...)` call and its output written alongside the main sources. **Most valuable item in this tier** if you want to build fixtures for service tests without hand-writing JSON |
-| `rootPackageName` | Derive package names from file paths, prefixed by a root | The parameter exists, but the plugin passes every file with an empty `normalizedPath` (via `toInputFiles()`), so setting it alone does nothing. Needs real relative-path computation first — this is what the removed `rootFolders` used to feed |
+- **`generateDataBuilders`** — the flag on `CodegenSchemaOptions` was not enough. The single
+  `buildSchemaAndOperationsSources` call had to be split into its three underlying steps
+  (`buildCodegenSchema` → `buildIrOperations` → `buildSchemaAndOperationsSourcesFromIr`) because
+  `buildDataBuilders` needs the intermediate `codegenSchema` and the IR's `usedCoordinates`, which the
+  convenience overload does not return. It also needs the **`CodegenMetadata` from the schema pass**
+  as `upstreamCodegenMetadata`; without it codegen fails with `Cannot resolve scalar target for
+  'String'`, because scalar targets are registered during schema generation.
+- **`rootPackageName`** — required computing a real `normalizedPath` per input file, relative to the
+  service `sourceFolder` and always with `/` separators. `ConfigUtils` also had to stop defaulting
+  `packageName`, since Apollo gives `packageName` precedence and the default would have made
+  `rootPackageName` silently inert.
 
 ### Tier 3 — larger, and probably not needed here
 
