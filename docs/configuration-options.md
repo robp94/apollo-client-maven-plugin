@@ -5,6 +5,10 @@ Status of every plugin option against **Apollo Kotlin 5.0.1**.
 Three sections: what the plugin **supports**, what was **removed** in the migration and why, and
 what Apollo 5 offers that the plugin **does not expose yet**.
 
+The *not yet supported* section is prioritised for a **JVM consumer** — a Java or Kotlin service
+calling a GraphQL API. Kotlin Multiplatform, Native and JS options are called out separately so they
+are not mistaken for work worth doing.
+
 Generated from the source as of 2026-08-01. See [apollo-5-migration-plan.md](apollo-5-migration-plan.md)
 for the migration itself.
 
@@ -118,37 +122,65 @@ unknown-parameter error, which is deliberate: a silent no-op would be worse than
 
 ## Not yet supported
 
-Available in Apollo 5 but not exposed by the plugin. Nothing here is blocked — each is additive
-work. Roughly ordered by likely usefulness.
+Available in Apollo 5 but not exposed by the plugin.
 
-### Codegen
+**Prioritised for a JVM consumer** — a Java or Kotlin service (Quarkus, Spring Boot) calling a
+GraphQL API. Kotlin Multiplatform, JS and Native concerns are deliberately at the bottom. Nothing
+here is blocked; the split below is by *effort*, not by feasibility.
 
-| Apollo option | What it does |
+### Tier 1 — pass-through
+
+Each of these is one field on `CompilerParams` plus one argument in `GraphQLClientMojo`. Apollo
+already accepts them on `buildCodegenOptions` / `buildIrOptions`; the plugin simply does not pass
+them. Adding several at once is barely more work than adding one.
+
+| Apollo option | Language | What it does | Why you would want it |
+|---|---|---|---|
+| `generateMethods` | both | Pick among `equalsHashCode`, `toString`, `copy`, `dataClass` | The most broadly useful gap. Java defaults to `equalsHashCode` + `toString`; Kotlin to `dataClass`. Controls whether models are usable as map keys, in assertions, and in logs |
+| `addUnknownForEnums` | both | Whether generated enums carry an `UNKNOWN` member | Schema evolution. Without it, a value the server adds after your build can blow up deserialisation |
+| `addDefaultArgumentForInputObjects` | both | Default arguments on generated input objects | Much less verbose construction of input types with many optional fields |
+| `generatePrimitiveTypes` | Java | `int`/`double`/`boolean` instead of boxed types | Avoids needless boxing and accidental `null` unboxing in Java models |
+| `classesForEnumsMatching` | Java | Java equivalent of `sealedClassesForEnumsMatching` | Access to the raw enum value for unknown server-side values |
+| `addJvmOverloads` | Kotlin | `@JvmOverloads` on generated constructors | Matters when Java code calls Kotlin-generated classes — a mixed Java/Kotlin codebase |
+| `generateInputBuilders` | Kotlin | Builders for input types *(experimental)* | Constructors require wrapping every optional field in `Optional`; builders avoid that |
+| `requiresOptInAnnotation` | Kotlin | Annotation used for `@requiresOptIn` schema elements | Only if your schema marks elements as requiring opt-in |
+| `generatedSchemaName` | both | Rename the generated `__Schema` class | Cosmetic; only relevant with `generateSchema` |
+| `addTypename` | both | When `__typename` is injected | Default `ifFragments` is almost always right. Change only for an unusual server |
+| `issueSeverities` (full map) | both | Severity per issue type | Today only deprecation is exposed, via `warnOnDeprecatedUsages`. The full map also covers unused fragments and variables |
+| `allowFragmentArguments` | both | Fragment arguments *(experimental)* | Only if your operations use them |
+
+> **Two implementation notes.** New Java-only or Kotlin-only options must follow the existing `isJava`
+> pattern in the mojo and be passed as `null` when they do not apply, or `CodegenOptions.validate()`
+> throws. And `decapitalizeFields` exists on **both** `IrOptions` and `CodegenOptions` — if it is ever
+> exposed, it must be set consistently on both or codegen and IR will disagree.
+
+### Tier 2 — needs a little machinery
+
+Still small, but not pure plumbing.
+
+| Apollo feature | What it does | Why it is more work |
+|---|---|---|
+| `generateDataBuilders` | Type-safe builders for constructing fake responses — the replacement for the removed test builders | The flag on `CodegenSchemaOptions` is not enough. Emitting them needs a separate `ApolloCompiler.buildDataBuilders(...)` call and its output written alongside the main sources. **Most valuable item in this tier** if you want to build fixtures for service tests without hand-writing JSON |
+| `rootPackageName` | Derive package names from file paths, prefixed by a root | The parameter exists, but the plugin passes every file with an empty `normalizedPath` (via `toInputFiles()`), so setting it alone does nothing. Needs real relative-path computation first — this is what the removed `rootFolders` used to feed |
+
+### Tier 3 — larger, and probably not needed here
+
+| Apollo feature | What it does | Relevance |
+|---|---|---|
+| `ApolloCompilerPlugin` | The v5 extension point: custom layouts, transforms, operation IDs | Real work. Only worth it if you need to customise codegen itself |
+| Custom operation IDs (`operationIdsGenerator`) | Replaces the default SHA-256 operation ID | Only for persisted queries **with a bespoke ID scheme**. Standard APQ expects the SHA-256 default, which is what the plugin already produces. The mojo already accepts this parameter and passes `null`, so restoring it is a config option plus a `Class.forName` |
+| Multi-module via `CodegenMetadata` | Share fragments and types across modules | Only if you split codegen across several Maven modules |
+| Document and output transforms | `documentTransform`, `schemaDocumentTransform`, `javaOutputTransform`, `kotlinOutputTransform` | Advanced codegen customisation |
+| `layoutFactory` | Custom naming and file layout | Advanced |
+| Foreign schemas / `@link` | Custom foreign schema definitions | Rare |
+
+### Not relevant to a JVM service
+
+Supported by Apollo, but meaningless outside Kotlin Multiplatform, Native or JS. Listed so nobody
+spends time on them by mistake.
+
+| Apollo option | Why not |
 |---|---|
-| `generateDataBuilders` | Type-safe data builders, the replacement for test builders. Needs a second `buildDataBuilders` call, not just a flag |
-| `generateMethods` | Choose among `equalsHashCode`, `toString`, `copy`, `dataClass` |
-| `addUnknownForEnums` | Whether enums get an `UNKNOWN` member |
-| `addDefaultArgumentForInputObjects` | Default arguments on generated input objects |
-| `generateInputBuilders` | Builders for input types *(experimental)* |
-| `addJvmOverloads` | `@JvmOverloads` on generated constructors |
-| `requiresOptInAnnotation` | Annotation to use for `@requiresOptIn` schema elements |
-| `decapitalizeFields` | Lowercase leading field characters |
-| `rootPackageName` | Derive package names from file paths under a root |
-| `generatedSchemaName` | Rename the generated `__Schema` class |
-| `classesForEnumsMatching` | Java equivalent of `sealedClassesForEnumsMatching` |
-| `generatePrimitiveTypes` | Java primitives instead of boxed types |
-| `generateApolloEnums`, `jsExport` | Experimental |
-
-### Compiler behaviour
-
-| Apollo feature | What it does |
-|---|---|
-| `ApolloCompilerPlugin` | The v5 extension point. Replaces the removed operation-ID generators and enables custom layouts and transforms. **The most significant gap** — it is the supported way to customise codegen in v5 |
-| Multi-module via `CodegenMetadata` | Share fragments and types across modules |
-| `operationIdsGenerator` | Custom operation IDs. Currently the Apollo default (SHA-256) |
-| `addTypename` | Control `__typename` insertion. Currently the Apollo default (`ifFragments`) |
-| `issueSeverities` (full map) | Only the deprecation severity is exposed, via `warnOnDeprecatedUsages` |
-| `allowFragmentArguments` | Fragment arguments *(experimental)* |
-| Foreign schemas / `@link` | Custom foreign schema definitions |
-| Document and output transforms | `documentTransform`, `schemaDocumentTransform`, `javaOutputTransform`, `kotlinOutputTransform` |
-| `layoutFactory` | Custom naming and file layout |
+| `jsExport` | Kotlin/JS only |
+| `generateApolloEnums` | Experimental, and aimed at multiplatform enum handling |
+| `generateFilterNotNull` | *Already exposed*, but only does anything for Kotlin Native. Harmless to leave at `false` |
